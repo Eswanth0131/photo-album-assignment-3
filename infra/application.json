@@ -519,6 +519,14 @@
                   {
                     "Priority": 1,
                     "SlotName": "SearchText"
+                  },
+                  {
+                    "Priority": 2,
+                    "SlotName": "KeywordOne"
+                  },
+                  {
+                    "Priority": 3,
+                    "SlotName": "KeywordTwo"
                   }
                 ],
                 "Slots": [
@@ -568,7 +576,7 @@
       },
       "Condition": "Full"
     },
-    "BotVersion470ac505e143": {
+    "BotVersion46a8d0fab689": {
       "Type": "AWS::Lex::BotVersion",
       "Properties": {
         "BotId": {
@@ -594,7 +602,7 @@
         },
         "BotVersion": {
           "Fn::GetAtt": [
-            "BotVersion470ac505e143",
+            "BotVersion46a8d0fab689",
             "BotVersion"
           ]
         },

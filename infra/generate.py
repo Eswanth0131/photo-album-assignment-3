@@ -152,7 +152,10 @@ def lex_locale():
     return {"LocaleId": "en_US", "NluConfidenceThreshold": 0.4, "Intents": [{
         "Name": "SearchIntent",
         "SampleUtterances": [{"Utterance": phrase} for phrase in utterances],
-        "SlotPriorities": [{"Priority": 1, "SlotName": "SearchText"}],
+        "SlotPriorities": [
+            {"Priority": priority, "SlotName": name}
+            for priority, name in enumerate(("SearchText", "KeywordOne", "KeywordTwo"), 1)
+        ],
         "Slots": [
             {"Name": name, "SlotTypeName": "AMAZON.AlphaNumeric",
              "ValueElicitationSetting": {"SlotConstraint": "Optional"}}
