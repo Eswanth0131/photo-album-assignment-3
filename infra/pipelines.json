@@ -1,0 +1,663 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Two independent GitHub-triggered pipelines for the photo album.",
+  "Parameters": {
+    "ConnectionArn": {
+      "Type": "String",
+      "AllowedPattern": "arn:[^:]+:(codeconnections|codestar-connections):.+:connection/.+"
+    },
+    "BackendRepository": {
+      "Type": "String",
+      "AllowedPattern": "[^/]+/[^/]+"
+    },
+    "FrontendRepository": {
+      "Type": "String",
+      "AllowedPattern": "[^/]+/[^/]+"
+    },
+    "BackendBranch": {
+      "Type": "String",
+      "Default": "main"
+    },
+    "FrontendBranch": {
+      "Type": "String",
+      "Default": "main"
+    },
+    "WebsiteBucket": {
+      "Type": "String"
+    },
+    "ApiId": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "Artifacts": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireBuilds",
+              "Status": "Enabled",
+              "ExpirationInDays": 30
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        }
+      }
+    },
+    "BackendBuildLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codebuild/${AWS::StackName}-backend"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "BackendBuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PhotoAlbum",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketVersioning",
+                    "s3:GetBucketAcl"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Artifacts",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-backend:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:UpdateFunctionCode",
+                    "lambda:GetFunctionConfiguration"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:index-photos"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:search-photos"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "BackendProject": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-backend"
+        },
+        "ServiceRole": {
+          "Fn::GetAtt": [
+            "BackendBuildRole",
+            "Arn"
+          ]
+        },
+        "Source": {
+          "Type": "CODEPIPELINE",
+          "BuildSpec": "buildspec-backend.yml"
+        },
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "Image": "aws/codebuild/standard:7.0",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "EnvironmentVariables": []
+        },
+        "LogsConfig": {
+          "CloudWatchLogs": {
+            "Status": "ENABLED",
+            "GroupName": {
+              "Ref": "BackendBuildLogs"
+            }
+          }
+        },
+        "TimeoutInMinutes": 15
+      }
+    },
+    "BackendPipelineRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PhotoAlbum",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketVersioning",
+                    "s3:GetBucketAcl"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Artifacts",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codeconnections:UseConnection",
+                    "codestar-connections:UseConnection"
+                  ],
+                  "Resource": {
+                    "Ref": "ConnectionArn"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codebuild:StartBuild",
+                    "codebuild:BatchGetBuilds"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "BackendProject",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "BackendPipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-backend"
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "BackendPipelineRole",
+            "Arn"
+          ]
+        },
+        "PipelineType": "V2",
+        "ExecutionMode": "QUEUED",
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": {
+            "Ref": "Artifacts"
+          }
+        },
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "Name": "GitHub",
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "AWS",
+                  "Provider": "CodeStarSourceConnection",
+                  "Version": "1"
+                },
+                "OutputArtifacts": [
+                  {
+                    "Name": "SourceCode"
+                  }
+                ],
+                "Configuration": {
+                  "ConnectionArn": {
+                    "Ref": "ConnectionArn"
+                  },
+                  "FullRepositoryId": {
+                    "Ref": "BackendRepository"
+                  },
+                  "BranchName": {
+                    "Ref": "BackendBranch"
+                  },
+                  "DetectChanges": "true",
+                  "OutputArtifactFormat": "CODE_ZIP"
+                }
+              }
+            ]
+          },
+          {
+            "Name": "BuildAndDeploy",
+            "Actions": [
+              {
+                "Name": "Backend",
+                "InputArtifacts": [
+                  {
+                    "Name": "SourceCode"
+                  }
+                ],
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {
+                    "Ref": "BackendProject"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "FrontendBuildLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codebuild/${AWS::StackName}-frontend"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "FrontendBuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PhotoAlbum",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketVersioning",
+                    "s3:GetBucketAcl"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Artifacts",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AWS::StackName}-frontend:*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucket",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${WebsiteBucket}"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject",
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${WebsiteBucket}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "apigateway:GET",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/${ApiId}/stages/v1/sdks/javascript"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "FrontendProject": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-frontend"
+        },
+        "ServiceRole": {
+          "Fn::GetAtt": [
+            "FrontendBuildRole",
+            "Arn"
+          ]
+        },
+        "Source": {
+          "Type": "CODEPIPELINE",
+          "BuildSpec": "buildspec-frontend.yml"
+        },
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "Image": "aws/codebuild/standard:7.0",
+          "ComputeType": "BUILD_GENERAL1_SMALL",
+          "EnvironmentVariables": [
+            {
+              "Name": "API_ID",
+              "Value": {
+                "Ref": "ApiId"
+              }
+            },
+            {
+              "Name": "WEBSITE_BUCKET",
+              "Value": {
+                "Ref": "WebsiteBucket"
+              }
+            }
+          ]
+        },
+        "LogsConfig": {
+          "CloudWatchLogs": {
+            "Status": "ENABLED",
+            "GroupName": {
+              "Ref": "FrontendBuildLogs"
+            }
+          }
+        },
+        "TimeoutInMinutes": 15
+      }
+    },
+    "FrontendPipelineRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "sts:AssumeRole",
+              "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "PhotoAlbum",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketVersioning",
+                    "s3:GetBucketAcl"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Artifacts",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Artifacts.Arn}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codeconnections:UseConnection",
+                    "codestar-connections:UseConnection"
+                  ],
+                  "Resource": {
+                    "Ref": "ConnectionArn"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codebuild:StartBuild",
+                    "codebuild:BatchGetBuilds"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "FrontendProject",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "FrontendPipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-frontend"
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "FrontendPipelineRole",
+            "Arn"
+          ]
+        },
+        "PipelineType": "V2",
+        "ExecutionMode": "QUEUED",
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": {
+            "Ref": "Artifacts"
+          }
+        },
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "Name": "GitHub",
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "AWS",
+                  "Provider": "CodeStarSourceConnection",
+                  "Version": "1"
+                },
+                "OutputArtifacts": [
+                  {
+                    "Name": "SourceCode"
+                  }
+                ],
+                "Configuration": {
+                  "ConnectionArn": {
+                    "Ref": "ConnectionArn"
+                  },
+                  "FullRepositoryId": {
+                    "Ref": "FrontendRepository"
+                  },
+                  "BranchName": {
+                    "Ref": "FrontendBranch"
+                  },
+                  "DetectChanges": "true",
+                  "OutputArtifactFormat": "CODE_ZIP"
+                }
+              }
+            ]
+          },
+          {
+            "Name": "BuildAndDeploy",
+            "Actions": [
+              {
+                "Name": "Frontend",
+                "InputArtifacts": [
+                  {
+                    "Name": "SourceCode"
+                  }
+                ],
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {
+                    "Ref": "FrontendProject"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "BackendPipeline": {
+      "Value": {
+        "Ref": "BackendPipeline"
+      }
+    },
+    "FrontendPipeline": {
+      "Value": {
+        "Ref": "FrontendPipeline"
+      }
+    },
+    "Artifacts": {
+      "Value": {
+        "Ref": "Artifacts"
+      }
+    }
+  }
+}

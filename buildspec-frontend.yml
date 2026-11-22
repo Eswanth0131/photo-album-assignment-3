@@ -1,0 +1,12 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+  pre_build:
+    commands:
+      - node --check frontend/app.js
+      - node --test tests/frontend.test.js
+  build:
+    commands:
+      - bash scripts/publish-frontend.sh "$API_ID" "$WEBSITE_BUCKET"
