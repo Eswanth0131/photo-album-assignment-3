@@ -64,7 +64,7 @@ Choose either mode initially. Upgrade the same minimum stack with `scripts/deplo
 ## Deploy the two GitHub pipelines
 
 1. Push the project to GitHub. For separate frontend and backend repos, put the project at the root of both repos. Each pipeline only runs its own buildspec. One shared repo is also supported, with either a shared branch or independent branches.
-2. In the same AWS region, open **Developer Tools → Settings → Connections**, create a GitHub connection, and complete the GitHub App authorization for both repos. Wait for status **Available**. Copy the connection ARN.
+2. In the same AWS region, open **Developer Tools → Settings → Connections** and create a GitHub connection. Install **AWS Connector for GitHub** with access to the source repos, select that installation under **GitHub Apps**, and choose **Connect**. Wait for status **Available** and copy the connection ARN. GitHub push notifications use the app installation. If a manually started pipeline fetches code but pushes do not trigger a run, check that the app is installed and includes the repo.
 3. Deploy the pipeline stack after the app stack succeeds.
 
    ```sh
