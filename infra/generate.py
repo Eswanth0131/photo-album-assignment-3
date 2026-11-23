@@ -393,6 +393,13 @@ def pipelines():
         resources[side + "Pipeline"] = resource("AWS::CodePipeline::Pipeline", {
             "Name": project_name, "RoleArn": att(pipeline_role, "Arn"),
             "PipelineType": "V2", "ExecutionMode": "QUEUED",
+            "Triggers": [{
+                "ProviderType": "CodeStarSourceConnection",
+                "GitConfiguration": {
+                    "SourceActionName": "GitHub",
+                    "Push": [{"Branches": {"Includes": [ref(side + "Branch")]}}],
+                },
+            }],
             "ArtifactStore": {"Type": "S3", "Location": ref("Artifacts")},
             "Stages": [
                 {"Name": "Source", "Actions": [{
@@ -402,7 +409,7 @@ def pipelines():
                     "Configuration": {"ConnectionArn": ref("ConnectionArn"),
                                       "FullRepositoryId": ref(side + "Repository"),
                                       "BranchName": ref(side + "Branch"),
-                                      "DetectChanges": "true", "OutputArtifactFormat": "CODE_ZIP"},
+                                      "DetectChanges": "false", "OutputArtifactFormat": "CODE_ZIP"},
                 }]},
                 {"Name": "BuildAndDeploy", "Actions": [{
                     "Name": side, "InputArtifacts": [{"Name": "SourceCode"}],

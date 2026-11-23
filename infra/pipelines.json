@@ -277,6 +277,25 @@
         },
         "PipelineType": "V2",
         "ExecutionMode": "QUEUED",
+        "Triggers": [
+          {
+            "ProviderType": "CodeStarSourceConnection",
+            "GitConfiguration": {
+              "SourceActionName": "GitHub",
+              "Push": [
+                {
+                  "Branches": {
+                    "Includes": [
+                      {
+                        "Ref": "BackendBranch"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
         "ArtifactStore": {
           "Type": "S3",
           "Location": {
@@ -310,7 +329,7 @@
                   "BranchName": {
                     "Ref": "BackendBranch"
                   },
-                  "DetectChanges": "true",
+                  "DetectChanges": "false",
                   "OutputArtifactFormat": "CODE_ZIP"
                 }
               }
@@ -576,6 +595,25 @@
         },
         "PipelineType": "V2",
         "ExecutionMode": "QUEUED",
+        "Triggers": [
+          {
+            "ProviderType": "CodeStarSourceConnection",
+            "GitConfiguration": {
+              "SourceActionName": "GitHub",
+              "Push": [
+                {
+                  "Branches": {
+                    "Includes": [
+                      {
+                        "Ref": "FrontendBranch"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
         "ArtifactStore": {
           "Type": "S3",
           "Location": {
@@ -609,7 +647,7 @@
                   "BranchName": {
                     "Ref": "FrontendBranch"
                   },
-                  "DetectChanges": "true",
+                  "DetectChanges": "false",
                   "OutputArtifactFormat": "CODE_ZIP"
                 }
               }

@@ -175,7 +175,9 @@ class TemplateTests(unittest.TestCase):
             pipeline = resources[side + "Pipeline"]["Properties"]
             source_stage = pipeline["Stages"][0]["Actions"][0]
             self.assertEqual(source_stage["Configuration"]["FullRepositoryId"], {"Ref": side + "Repository"})
-            self.assertEqual(source_stage["Configuration"]["DetectChanges"], "true")
+            trigger = pipeline["Triggers"][0]["GitConfiguration"]
+            self.assertEqual(trigger["SourceActionName"], source_stage["Name"])
+            self.assertEqual(trigger["Push"], [{"Branches": {"Includes": [{"Ref": side + "Branch"}]}}])
             build = resources[side + "Project"]["Properties"]
             self.assertEqual(build["Source"]["BuildSpec"], "buildspec-" + side.lower() + ".yml")
 
