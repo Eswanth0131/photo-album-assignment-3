@@ -130,7 +130,18 @@ cfn-lint -r us-east-1 -t infra/application.json infra/pipelines.json
    aws logs tail /aws/lambda/search-photos --since 15m
    ```
 
-4. Push to both GitHub branches and record the corresponding successful pipeline execution IDs. Compare the Lambda code’s last-modified time and the frontend object’s timestamp or content with the pushed revisions.
+4. Push a commit to each configured branch. If both pipelines watch the same branch, one push should start both. For the default pipeline stack name, check the triggered commit and execution status:
+
+   ```sh
+   for pipeline in photo-album-a3-ci-backend photo-album-a3-ci-frontend; do
+     printf '%s\n' "$pipeline"
+     aws codepipeline list-pipeline-executions --pipeline-name "$pipeline" --max-results 3 \
+       --query 'pipelineExecutionSummaries[].[status,sourceRevisions[0].revisionId,pipelineExecutionId]' \
+       --output table
+   done
+   ```
+
+   Record the successful execution IDs for the pushed commit. Compare the Lambda code’s last-modified time and the frontend object's timestamp or content with the deployed revision.
 
 | Symptom | Where to check |
 | --- | --- |
