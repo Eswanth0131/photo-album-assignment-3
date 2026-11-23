@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from infra.generate import application, pipelines, source
+from infra.generate import application, lex_locale, pipelines, source
 
 
 def runtime(name):
@@ -161,6 +161,13 @@ class TemplateTests(unittest.TestCase):
         for method in (upload, api["/search"]["get"]):
             self.assertEqual(method["security"], [{"api_key": []}])
         self.assertNotIn("security", api["/photos"]["options"])
+
+    def test_lex_prioritizes_all_slots(self):
+        intent = lex_locale()["Intents"][0]
+        positions = intent["SlotPriorities"]
+        self.assertEqual({slot["Name"] for slot in intent["Slots"]},
+                         {slot["SlotName"] for slot in positions})
+        self.assertEqual([slot["Priority"] for slot in positions], [1, 2, 3])
 
     def test_distinct_github_sources_and_builds(self):
         resources = pipelines()["Resources"]

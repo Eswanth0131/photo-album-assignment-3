@@ -18,9 +18,10 @@ def session():
 @lru_cache
 def client(service):
     timeout = 4 if service == "lexv2-runtime" else 10
-    return session().client(service, config=Config(
-        connect_timeout=2, read_timeout=timeout, retries={"total_max_attempts": 2},
-    ))
+    options = {"connect_timeout": 2, "read_timeout": timeout, "retries": {"total_max_attempts": 2}}
+    if service == "s3":
+        options.update(signature_version="s3v4", s3={"us_east_1_regional_endpoint": "regional"})
+    return session().client(service, config=Config(**options))
 
 
 class SearchServiceError(Exception):
